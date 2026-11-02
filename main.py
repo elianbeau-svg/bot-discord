@@ -8,9 +8,8 @@ client = discord.Client(intents=intents)
 # Nom exact du salon vocal à surveiller
 NOM_SALON_VOCAL = "👶 Orthophoniste 👶"
 
-# Nom ou ID du salon textuel où envoyer les messages
-# (Tu peux mettre l'ID du salon textuel sous forme de nombre si tu préfères, ex: 123456789)
-NOM_SALON_TEXTE = "orthophoniste" 
+# ID de ton salon textuel 💬-ɢᴇ́ɴᴇ́ʀᴀʟ-💬 (remplace les chiffres par l'ID copié depuis Discord)
+ID_SALON_TEXTE = 759884193042923544  
 
 @client.event
 async def on_ready():
@@ -18,9 +17,8 @@ async def on_ready():
 
 @client.event
 async def on_voice_state_update(member, before, after):
-    # Récupération du salon textuel où poster
-    # Si tu as mis un ID, utilise client.get_channel(ID)
-    text_channel = discord.utils.get(member.guild.text_channels, name=NOM_SALON_TEXTE)
+    # Récupération du salon textuel via son ID unique
+    text_channel = client.get_channel(ID_SALON_TEXTE)
     if not text_channel:
         return
 
@@ -46,6 +44,6 @@ async def on_voice_state_update(member, before, after):
         )
         await text_channel.send(msg_depart)
 
-# Récupère le Token depuis les variables d'environnement de Render
+# Récupère le Token depuis les variables d'environnement
 token = os.getenv("DISCORD_TOKEN")
 client.run(token)
