@@ -3,7 +3,6 @@ import time
 import random
 import discord
 
-# Il faut activer l'intent pour lire les messages (Message Content Intent)
 intents = discord.Intents.default()
 intents.voice_states = True
 intents.message_content = True 
@@ -18,23 +17,54 @@ NOM_SALON_RAGE = "😡 Rage bait 😡"
 # ID de ton salon textuel 💬-ɢᴇ́ɴᴇ́ʀᴀʟ-💬
 ID_SALON_TEXTE = 759884193042923544  
 
-# Dictionnaires pour sauvegarder les données
+# Dictionnaires de sauvegarde en mémoire
 sessions_pignolle = {}
-victimes_rage_bait = {} # Stocke {id_utilisateur: reponse_attendue}
+victimes_rage_bait = {} 
 
 def format_duree(secondes):
-    """Transforme les secondes en un format lisible (ex: 2 min et 15 sec)."""
+    """Transforme les secondes en un format lisible."""
     minutes, secs = divmod(int(secondes), 60)
     heures, minutes = divmod(minutes, 60)
-    
     parts = []
-    if heures > 0:
-        parts.append(f"{heures} h")
-    if minutes > 0:
-        parts.append(f"{minutes} min")
+    if heures > 0: parts.append(f"{heures} h")
+    if minutes > 0: parts.append(f"{minutes} min")
     parts.append(f"{secs} sec")
-    
     return " et ".join(parts)
+
+def generer_defi():
+    """Génère un défi aléatoire (La fameuse roulette)"""
+    jeux = ["math", "copie", "envers", "devinette"]
+    choix = random.choice(jeux)
+
+    if choix == "math":
+        a = random.randint(4, 15)
+        b = random.randint(3, 9)
+        return (f"🧠 **Combien font {a} x {b} ?**", str(a * b), "math")
+
+    elif choix == "copie":
+        phrases = [
+            "Je jure solennellement que je suis un gros noob.",
+            "Le créateur de ce bot est mon maître absolu.",
+            "J'ai cliqué sur le salon rage bait comme un pigeon."
+        ]
+        phrase = random.choice(phrases)
+        return (f"✍️ **Recopie EXACTEMENT cette phrase (avec la majuscule et le point) :**\n`{phrase}`", phrase, "copie")
+
+    elif choix == "envers":
+        mots = ["Discord", "Troll", "Raquette", "Pignolle", "Chouquette", "Saucisson"]
+        mot = random.choice(mots)
+        reponse = mot[::-1].lower() # Le mot inversé, en minuscules
+        return (f"🔄 **Écris ce mot complètement à l'envers :** `{mot}`", reponse, "envers")
+
+    elif choix == "devinette":
+        devinettes = [
+            ("Combien de mois ont 28 jours dans une année ?", ["12", "douze", "tous"]),
+            ("Je suis grand quand je suis jeune, et petit quand je suis vieux. Qui suis-je ?", ["un crayon", "crayon", "une bougie", "bougie"]),
+            ("Qu'est-ce qui a des clés mais ne peut pas ouvrir de portes ?", ["un piano", "piano", "le piano", "clavier", "un clavier"])
+        ]
+        dev, reponses_valides = random.choice(devinettes)
+        return (f"❓ **Énigme :** {dev}", reponses_valides, "devinette")
+
 
 @client.event
 async def on_ready():
@@ -43,45 +73,50 @@ async def on_ready():
 @client.event
 async def on_voice_state_update(member, before, after):
     text_channel = client.get_channel(ID_SALON_TEXTE)
-    if not text_channel:
-        return
+    if not text_channel: return
 
     # ==========================================
-    # 3. GESTION DU PIÈGE : RAGE BAIT (Anti-fuite)
-    # On met ça en premier pour empêcher toute fuite !
+    # 3. GESTION DU PIÈGE : RAGE BAIT
     # ==========================================
     if member.id in victimes_rage_bait:
-        # Si la victime essaie de rejoindre un autre salon vocal...
+        # Anti-fuite : On le ramène s'il essaie de fuir ailleurs
         if after.channel and after.channel.name != NOM_SALON_RAGE:
             rage_channel = discord.utils.get(member.guild.voice_channels, name=NOM_SALON_RAGE)
             if rage_channel:
-                await member.move_to(rage_channel) # Ramené de force !
-                await text_channel.send(f"🛑 NOP ! {member.mention} essaie de fuir le rage bait ! Résous l'énigme d'abord ! 😈")
-            return # On arrête l'exécution ici pour lui
+                await member.move_to(rage_channel)
+                await text_channel.send(f"🛑 NOP ! {member.mention} essaie de fuir ! Retourne dans ta cage et finis l'épreuve ! 😈")
+            return 
 
-    # Entrée dans le salon Rage Bait (Déclenchement du piège)
+    # Entrée dans le piège
     if after.channel and after.channel.name == NOM_SALON_RAGE and (before.channel is None or before.channel.name != NOM_SALON_RAGE):
-        # On génère un calcul aléatoire
-        a = random.randint(4, 15)
-        b = random.randint(3, 9)
-        reponse = str(a * b)
-        victimes_rage_bait[member.id] = reponse
+        
+        # S'il était déjà piégé et qu'on l'a ramené (ou qu'il s'est reco), on ne change pas le défi !
+        if member.id in victimes_rage_bait:
+            await text_channel.send(f"Tu croyais m'échapper {member.mention} ? Résous d'abord ton défi en cours ! 😈")
+            return
+            
+        # Si c'est une nouvelle victime, on génère la roulette
+        texte_defi, reponse_attendue, type_jeu = generer_defi()
+        
+        # On sauvegarde sa punition
+        victimes_rage_bait[member.id] = {
+            'reponse': reponse_attendue,
+            'type': type_jeu
+        }
 
         msg_piege = (
             f"🚨 **ALERTE RAGE BAIT** 🚨\n"
-            f"Ah ! {member.mention} vient de tomber dans le piège ! Tu es maintenant **BLOQUÉ(E)** ici.\n"
-            f"Pour regagner ta liberté et pouvoir changer de salon, tu dois répondre à ceci dans le chat :\n\n"
-            f"🧠 **Combien font {a} x {b} ?**\n\n"
-            f"*(Si tu essaies de fuir vers un autre salon, je te ramènerai ici de force 😈)*"
+            f"Ah ! {member.mention} vient de tomber dans le piège ! Tu es **BLOQUÉ(E)** ici.\n"
+            f"Pour regagner ta liberté, tu dois réussir cette épreuve :\n\n"
+            f"{texte_defi}\n\n"
+            f"*(Toute tentative de fuite sera punie par un retour de force 😈)*"
         )
         await text_channel.send(msg_piege)
         return
 
-
     # ==========================================
     # 1. GESTION DU SALON ORTHOPHONISTE
     # ==========================================
-    
     if after.channel and after.channel.name == NOM_SALON_ORTHO and (before.channel is None or before.channel.name != NOM_SALON_ORTHO):
         msg_arrivee = (
             f"B-b-bonjour {member.mention}, b-b-bienvenue d-dans n-notre c-c-cabinet d'o-o-orthophoniste.\n\n"
@@ -103,16 +138,14 @@ async def on_voice_state_update(member, before, after):
         await text_channel.send(msg_depart)
 
     # ==========================================
-    # 2. GESTION DU SALON PIGNOLLE (CHRONO)
+    # 2. GESTION DU SALON PIGNOLLE
     # ==========================================
-    
     if after.channel and after.channel.name == NOM_SALON_PIGNOLLE and (before.channel is None or before.channel.name != NOM_SALON_PIGNOLLE):
         sessions_pignolle[member.id] = time.time()
 
     elif before.channel and before.channel.name == NOM_SALON_PIGNOLLE and (after.channel is None or after.channel.name != NOM_SALON_PIGNOLLE):
         if member.id in sessions_pignolle:
-            debut = sessions_pignolle.pop(member.id)
-            duree_secondes = time.time() - debut
+            duree_secondes = time.time() - sessions_pignolle.pop(member.id)
             duree_texte = format_duree(duree_secondes)
 
             if duree_secondes < 30:
@@ -124,33 +157,47 @@ async def on_voice_state_update(member, before, after):
             else:
                 commentaire = "🚨 Attention aux crampes et aux brûlures au second degré à ce stade !"
 
-            msg_pignolle = (
-                f"📊 **Bilan de la séance de {member.mention} :**\n"
-                f"S'est pignollé(e) pendant exactement **{duree_texte}** !\n"
-                f"{commentaire}"
-            )
-            await text_channel.send(msg_pignolle)
+            await text_channel.send(f"📊 **Bilan de la séance de {member.mention} :**\nS'est pignollé(e) pendant exactement **{duree_texte}** !\n{commentaire}")
 
 # ==========================================
-# 4. GESTION DES MESSAGES (Pour résoudre le mini-jeu)
+# 4. GESTION DES MESSAGES (Résolution du mini-jeu)
 # ==========================================
 @client.event
 async def on_message(message):
-    # Éviter que le bot se réponde à lui-même
-    if message.author == client.user:
+    if message.author == client.user: 
         return
 
-    # Vérifier si la personne qui écrit est actuellement piégée
     if message.author.id in victimes_rage_bait:
-        reponse_attendue = victimes_rage_bait[message.author.id]
-
-        # Si le message contient la bonne réponse
-        if message.content.strip() == reponse_attendue:
-            del victimes_rage_bait[message.author.id] # On le libère
-            await message.channel.send(f"✅ Bien joué {message.author.mention}, réponse correcte ! La malédiction est levée, tu es libre de fuir ! 🕊️")
+        donnees_jeu = victimes_rage_bait[message.author.id]
+        
+        # Sécurité au cas où il reste une vieille version en mémoire
+        if isinstance(donnees_jeu, str):
+            reponse_attendue = donnees_jeu
+            type_jeu = "math"
         else:
-            # Petite moquerie si c'est faux (optionnel mais drôle)
-            await message.channel.send(f"❌ Faux ! Calcule mieux que ça {message.author.mention}... (Rappel : tu es toujours bloqué(e) au cachot !)")
+            reponse_attendue = donnees_jeu['reponse']
+            type_jeu = donnees_jeu['type']
+        
+        reponse_utilisateur = message.content.strip()
+        reussite = False
+
+        # Vérification selon le type de jeu
+        if type_jeu == "copie":
+            if reponse_utilisateur == reponse_attendue:
+                reussite = True
+        elif type_jeu == "devinette":
+            if reponse_utilisateur.lower() in [r.lower() for r in reponse_attendue]:
+                reussite = True
+        else: # Pour "math" et "envers"
+            if reponse_utilisateur.lower() == reponse_attendue:
+                reussite = True
+
+        # Résultat
+        if reussite:
+            del victimes_rage_bait[message.author.id]
+            await message.channel.send(f"✅ Bien joué {message.author.mention}, c'est exact ! Tu es libre de fuir le cachot ! 🕊️")
+        else:
+            await message.channel.send(f"❌ Faux ! Essaie encore {message.author.mention} 🤡 (Rappel : tu es toujours bloqué(e) !)")
 
 # Lancement du bot
 token = os.getenv("DISCORD_TOKEN")
